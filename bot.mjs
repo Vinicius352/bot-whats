@@ -1,20 +1,6 @@
 import * as baileys from '@whiskeysockets/baileys';
 import qrcode from 'qrcode-terminal';
 
-const frasesMotivacionais = [
-  "A persistência é o caminho do êxito.",
-  "Você é capaz de tudo que quiser.",
-  "Não existe vitória sem luta.",
-  "O sucesso começa com a decisão de tentar.",
-  "Mesmo que pareça impossível, insista.",
-  // Frases sem sentido motivacionais:
-  "O pássaro que canta de cabeça para baixo nunca perde a chave do armário.",
-  "Se a vida te der limões, peça pizza e ignore os limões.",
-  "Nunca confie em um sapo que usa relógio.",
-  "O universo conspira a favor de quem dança com guarda-chuva.",
-  "Quando a lua está azul, o café sabe melhor."
-];
-
 async function startBot() {
   const { state, saveCreds } = await baileys.useMultiFileAuthState('./auth_info_multi');
 
@@ -36,12 +22,12 @@ async function startBot() {
         (lastDisconnect?.error)?.output?.statusCode !== baileys.DisconnectReason.loggedOut;
       console.log('❌ Conexão encerrada. Reconectando?', shouldReconnect);
       if (shouldReconnect) {
-        startBot(); // tenta reconectar
+        startBot();
       }
     }
 
     if (connection === 'open') {
-      console.log('✅ Conectado com sucesso!');
+      console.log('✅ Bot conectado ao WhatsApp!');
     }
   });
 
@@ -54,42 +40,36 @@ async function startBot() {
     const isGroup = from.endsWith('@g.us');
     const messageText = msg.message.conversation || msg.message.extendedTextMessage?.text;
 
-    // Lista de comandos para mostrar no !comandos
-    const listaComandos = [
-      '!berrante - Marca todos e toca o berrante (somente admins)',
-      '!frases - Envia uma frase motivacional aleatória',
-      '!ping - Responde com Pong!',
-      '!hora - Mostra a hora atual',
-      '!comandos - Lista os comandos disponíveis',
-    ];
-
-    if (!messageText) return;
-
-    if (messageText === '!comandos') {
-      const textoComandos = listaComandos.map(c => `!comando ${c}`).join('\n');
-      await sock.sendMessage(from, { text: `Aqui estão os comandos disponíveis:\n\n${textoComandos}` });
-      return;
+    async function isAdmin(jid, participantId) {
+      try {
+        const groupMetadata = await sock.groupMetadata(jid);
+        const participant = groupMetadata.participants.find(p => p.id === participantId);
+        return participant?.admin === 'admin' || participant?.admin === 'superadmin';
+      } catch {
+        return false;
+      }
     }
 
     if (messageText === '!berrante') {
       if (!isGroup) {
-        await sock.sendMessage(from, { text: 'Esse comando só funciona em grupos!' });
+        await sock.sendMessage(from, { text: '❗ Esse comando só funciona em grupos!' });
+        return;
+      }
+
+      const sender = msg.key.participant || msg.key.remoteJid;
+      const senderIsAdmin = await isAdmin(from, sender);
+
+      if (!senderIsAdmin) {
+        await sock.sendMessage(from, { text: '🚫 Apenas administradores podem usar esse comando.' });
         return;
       }
 
       try {
         const groupMetadata = await sock.groupMetadata(from);
         const participants = groupMetadata.participants;
-
-        const senderParticipant = participants.find(p => p.id === msg.key.participant);
-
-        if (!senderParticipant || !senderParticipant.admin) {
-          await sock.sendMessage(from, { text: '❌ Somente administradores podem usar esse comando.' });
-          return;
-        }
-
         const mentions = participants.map(p => p.id);
-        const text = `toca o berrante seu moço ${mentions.map(id => '@' + id.split('@')[0]).join(' ')}`;
+
+        const text = `🔔 Toca o berrante seu moço ${mentions.map(id => '@' + id.split('@')[0]).join(' ')}`;
 
         await sock.sendMessage(from, {
           text,
@@ -97,26 +77,61 @@ async function startBot() {
         });
       } catch (error) {
         console.error('Erro ao tocar o berrante:', error);
-        await sock.sendMessage(from, { text: 'Erro ao tentar tocar o berrante no grupo.' });
+        await sock.sendMessage(from, { text: '❌ Erro ao tentar tocar o berrante no grupo.' });
       }
-      return;
-    }
-
-    if (messageText === '!frases') {
-      const fraseAleatoria = frasesMotivacionais[Math.floor(Math.random() * frasesMotivacionais.length)];
-      await sock.sendMessage(from, { text: fraseAleatoria });
-      return;
     }
 
     if (messageText === '!ping') {
       await sock.sendMessage(from, { text: '🏓 Pong!' });
-      return;
     }
 
     if (messageText === '!hora') {
       const hora = new Date().toLocaleTimeString('pt-BR');
       await sock.sendMessage(from, { text: `🕒 Agora são ${hora}` });
-      return;
+    }
+
+    if (messageText === '!frases') {
+      const frases = [
+        "🚀 Acredite no impossível e dance com unicórnios! 🦄✨",
+        "🌟 Sua coragem é mais brilhante que mil estrelas! ⭐️⭐️⭐️",
+        "🍀 Alegria é o combustível da vida, abasteça sempre! ⛽️😄",
+        "🎈 Sorria, mesmo que seu café esteja frio ☕️😂",
+        "💡 Pensamentos voam alto, deixe-os aterrissar no sucesso! ✈️🏆",
+        "🌀 O universo conspira a favor dos sonhadores malucos! 🤪🌌",
+        "🌻 Seja como o girassol, que segue a luz mesmo no escuro 🌞🌙",
+        "🔥 Fogueira não queima o sonho, só esquenta a alma! 🔥💭",
+        "🌈 Cores da vida são feitas de risos e abraços! 🤗🎨",
+        "🌊 Navegue nas ondas do impossível com sorriso no rosto! 😄🌊",
+        "🍉 A vida é uma melancia: cheia de sabor e um pouco de bagunça! 😜🍉",
+        "🦉 Sabedoria é a luz que guia até nos dias nublados 🌧️💡",
+        "🌌 Viaje no espaço da sua mente e encontre estrelas cadentes 🌠✨",
+        "🎵 A melodia do sucesso toca mais alto quando o coração dança 🎶❤️",
+        "🌱 Plante ideias e colha realizações incríveis! 🌿🌟",
+        "🐢 Até a tartaruga chega longe, com paciência e persistência! 🐢🏁",
+        "🎉 Celebre cada passo, mesmo os pequenos são gigantes! 🦶🎊",
+        "🦄 Sonhe alto, mesmo que o mundo diga que é estranho! 🛸🌟",
+        "☕ O café da manhã dos campeões é feito de coragem e esperança! ☕💪",
+        "🕰️ Tempo é o amigo que transforma esforços em vitórias! ⏳🏆"
+      ];
+      const frase = frases[Math.floor(Math.random() * frases.length)];
+      await sock.sendMessage(from, { text: frase });
+    }
+
+    if (messageText === '!comandos') {
+      const comandos = `
+👑 Desenvolvido por Vinicius (ELGORDAOTV)
+
+📜 *Comandos disponíveis:*
+!berrante - Marca todo mundo e toca o berrante 🔔 (Só admins)
+!ping - Testa se o bot está ativo 🏓
+!hora - Mostra a hora atual 🕒
+!frases - Envia uma frase motivacional ou sem sentido 💬
+!comandos - Lista os comandos disponíveis 📋
+
+⚙️ Mais códigos em breve...
+      `.trim();
+
+      await sock.sendMessage(from, { text: comandos });
     }
   });
 }
